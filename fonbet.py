@@ -26,12 +26,13 @@ REGEX_JSON = re.compile(
     re.DOTALL | re.IGNORECASE
 )
 
+NEED_SPORT_KINDS = ['Футбол', 'Хоккей', 'Баскетбол']
+
 
 # service ####
 
 
 def safe_request(prepare_request, session=session, attempts=5, sleep=2):
-    # добавить еще условий валидности данных
     for attemp in range(attempts):
         try:
             response = session.send(
@@ -79,6 +80,7 @@ req_topEvents3 = Request(
 
 ###
 
+
 def get_json(response, xpath_json=XPATH_JSON, regex=REGEX_JSON):
     text = html.fromstring(response.text)
     tag_content = text.xpath(xpath_json)
@@ -87,21 +89,26 @@ def get_json(response, xpath_json=XPATH_JSON, regex=REGEX_JSON):
         return json.loads(json_str.group())
 
 
-def get_actual_events():
+def get_actual_events(sport_kinds=NEED_SPORT_KINDS):
     # получаем некоторые данные всех текущих ивентов с главной
+    '''
+    sports_kinds - фильтр в виде списка названий видов спорта
+        названия должны быть точными
+    '''
     response = safe_request(req_topEvents3)
     json_ = response.json()
     result = []
     for event in json_['events']:
-        result.append(
-            {
-                'id': event['id'],
-                'competition': event['competitionName'],
-                'sport': event['skName'],
-                'start': event['startTimeTimestamp'],
-                # стороны, коэффы места в таблице добавляются позже
-            }
-        )
+        if event['skName'] in sport_kinds:
+            result.append(
+                {
+                    'event_id': event['id'],
+                    'competition': event['competitionName'],
+                    'sport': event['skName'],
+                    'start': event['startTimeTimestamp'],
+                    # стороны, коэффы и места в таблице добавляются позже
+                }
+            )
     return result
 
 
@@ -164,11 +171,11 @@ def get_teams_info(event_id):
             result[field] = teamdict[field]
         # поля страны отдельно
         country = {}
-        country_data = teamdict['cc']
-        # print(country_data)
-        for field in ['name', 'a2', 'a3', 'ioc', 'continent']:
-            country[field] = country_data[field]
-        result['country'] = country
+        country_data = teamdict.get('cc')
+        if country_data:
+            for field in ['name', 'a2', 'a3', 'ioc', 'continent']:
+                country[field] = country_data[field]
+            result['country'] = country
         return result
 
     hometeam_data = team_data(hometeam_uid)
@@ -181,11 +188,11 @@ def get_teams_info(event_id):
     }
 
 
-def get_actual_outcomes():
-    events = get_actual_events()
+def get_actual_outcomes(sport_kinds=NEED_SPORT_KINDS):
+    events = get_actual_events(sport_kinds)
     result = []
     for event in events:
-        teams_info = get_teams_info(event['id'])
+        teams_info = get_teams_info(event['event_id'])
         teams_info.update(event)
         result.append(teams_info)
-        return result
+    return result
