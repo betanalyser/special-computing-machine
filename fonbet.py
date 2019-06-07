@@ -40,12 +40,13 @@ def safe_request(prepare_request, session=session, attempts=5, sleep=2):
             if response.status_code == 200:
                 return response
         except (Timeout, TooManyRedirects, RequestException):
-            time.sleep(sleep)
+            # time.sleep(sleep)
+            pass
     else:
-        raise RuntimeError('no data found')
+        raise RuntimeError(f'invalid status code')
 
 
-# urls ####
+###
 
 URL_FONBET = 'https://www.fonbet.ru'
 URL_SPORTRADAR = 'https://s5.sir.sportradar.com/fonbet'
@@ -57,12 +58,8 @@ req_urls_json = Request(
 )
 
 URLS_JSON = safe_request(req_urls_json).json()
-URL_COMMON = f'https:{URLS_JSON["common"][-1]}'
-URL_LINE = f'https:{URLS_JSON["line"][-1]}'
-
-
-###
-
+URL_COMMON = f'https:{URLS_JSON["common"][0]}'
+URL_LINE = f'https:{URLS_JSON["line"][0]}'
 
 req_topEvents3 = Request(
     method='GET',
@@ -139,6 +136,7 @@ def get_match(event_id, url_sportradar=URL_SPORTRADAR, lang='ru'):
 
 
 def get_teams_info(event_id):
+    # возвращает None если данные о паре не найдены
     matchdict = get_match(event_id)
     if not matchdict['options']['h2hParamsInfo']:
         # если почему-то матч не найден
@@ -201,7 +199,11 @@ def get_teams_info(event_id):
     awayteam_data = team_data(awayteam_uid)
 
     target_field = f'stats_season_tables/{season}'
-    tables = matchdict['fetchedData'][target_field]['data']['tables']
+    target = matchdict['fetchedData'].get(target_field)
+    if not target:
+        return
+
+    tables = target['data']['tables']
     for table in tables:
         for row in table['tablerows']:
             team_uid = row['team']['uid']
