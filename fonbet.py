@@ -3,7 +3,6 @@ import json
 import time
 
 from lxml import html
-import requests
 from requests import Request, Session
 from requests import Timeout, TooManyRedirects, RequestException
 
@@ -89,23 +88,43 @@ def get_json(response, xpath_json=XPATH_JSON, regex=REGEX_JSON):
         return json.loads(json_str.group())
 
 
-def get_actual_events(sport_kinds=NEED_SPORT_KINDS):
-    # получаем некоторые данные всех текущих ивентов с главной
+def get_actual_events(
+        coeff_min=float('-inf'), coeff_max=float('inf'),
+        sport_kinds=NEED_SPORT_KINDS):
     '''
+    Получаем некоторые данные всех текущих ивентов с главной.
     sports_kinds - фильтр в виде списка названий видов спорта
-        названия должны быть точными
+        названия должны быть точными.
+        Можно указать None если хотим все ивенты.
     '''
+
+    def event_fits(event):
+        if sport_kinds and event['skName'] not in sport_kinds:
+            return False
+        for market in event['markets']:
+            if market['ident'] == 'Results':  # Исходы
+                break
+        for row in market['rows']:
+            if 'isTitle' not in row:
+                for cell in row['cells']:
+                    if 'isTitle' not in cell:
+                        value = cell.get('value')
+                        if value:
+                            if coeff_min <= value <= coeff_max:
+                                return True
+        return False
+
     response = safe_request(req_topEvents3)
     json_ = response.json()
     result = []
     for event in json_['events']:
-        if event['skName'] in sport_kinds:
+        if event_fits(event):
             result.append(
                 {
                     'event_id': event['id'],
                     'competition': event['competitionName'],
                     'sport': event['skName'],
-                    'start': event['startTimeTimestamp'],
+                    'start': event['startTimeTimestamp']
                     # стороны, коэффы и места в таблице добавляются позже
                 }
             )
@@ -114,18 +133,21 @@ def get_actual_events(sport_kinds=NEED_SPORT_KINDS):
 
 def get_match(event_id, url_sportradar=URL_SPORTRADAR, lang='ru'):
     url_match = f'{url_sportradar}/{lang}/match/m{event_id}'
-    response = requests.get(url_match)
+    request = Request(method='GET', url=url_match)
+    response = safe_request(request)
     return get_json(response)
 
 
 def get_teams_info(event_id):
     matchdict = get_match(event_id)
-    # stats_season_tables/ - тут можно получить место в таблице
-    # season = params['season']
+    if not matchdict['options']['h2hParamsInfo']:
+        # если почему-то матч не найден
+        return
     params = matchdict['routing']['params']
-    hometeam_uid = params['homeTeamUid']
-    awayteam_uid = params['awayTeamUid']
+    season = params['season']
     match_id = params['matchId']
+    hometeam_uid = int(params['homeTeamUid'])
+    awayteam_uid = int(params['awayTeamUid'])
 
     target_field = f'stats_team_odds_client/{hometeam_uid}'
     data = matchdict['fetchedData'][target_field]['data']
@@ -161,10 +183,7 @@ def get_teams_info(event_id):
             'nickname',
             'abbr',
             'suffix',
-            'sex',
-            # 'website',
-            # 'twitter',
-            # 'hashtag'
+            'sex'
         ]
         result = {}
         for field in need_fields_team:
@@ -181,6 +200,22 @@ def get_teams_info(event_id):
     hometeam_data = team_data(hometeam_uid)
     awayteam_data = team_data(awayteam_uid)
 
+    target_field = f'stats_season_tables/{season}'
+    tables = matchdict['fetchedData'][target_field]['data']['tables']
+    for table in tables:
+        for row in table['tablerows']:
+            team_uid = row['team']['uid']
+            weight = row.get('pointsTotal')
+            if not weight:
+                weight = row['winTotal']
+
+            if team_uid == hometeam_uid:
+                hometeam_data['weight'] = weight
+            elif team_uid == awayteam_uid:
+                awayteam_data['weight'] = weight
+            elif 'weight' in hometeam_data and 'weight' in awayteam_data:
+                break
+
     return {
         'home': hometeam_data,
         'away': awayteam_data,
@@ -188,11 +223,23 @@ def get_teams_info(event_id):
     }
 
 
-def get_actual_outcomes(sport_kinds=NEED_SPORT_KINDS):
-    events = get_actual_events(sport_kinds)
+def get_actual_outcomes(
+        coeff_min=float('-inf'), coeff_max=float('inf'),
+        sport_kinds=NEED_SPORT_KINDS, count=float('inf')):
+
+    events = get_actual_events(
+        coeff_min=coeff_min,
+        coeff_max=coeff_max,
+        sport_kinds=sport_kinds
+    )
     result = []
+    n = 0
     for event in events:
         teams_info = get_teams_info(event['event_id'])
-        teams_info.update(event)
-        result.append(teams_info)
+        if teams_info:
+            teams_info.update(event)
+            result.append(teams_info)
+            n += 1
+            if n >= count:
+                break
     return result
