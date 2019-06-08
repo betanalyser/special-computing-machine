@@ -26,7 +26,11 @@ REGEX_JSON = re.compile(
 )
 
 NEED_SPORT_KINDS = ['Футбол', 'Хоккей', 'Баскетбол']
-
+SPORT_TO_NAME = {
+    'Футбол': 'football',
+    'Хоккей': 'hockey',
+    'Баскетбол': 'basketball'
+}
 
 # service ####
 
@@ -114,11 +118,18 @@ def actual_events(
     for event in json_['events']:
         if event_fits(event, sport_kinds,
                       coeff_min=coeff_min, coeff_max=coeff_max):
+            sk_name = event['skName']
+            event_id = event['id']
+            comp_id = event["competitionId"]
+            sport = SPORT_TO_NAME[sk_name]
+            link = f'{URL_FONBET}/#!/bets/{sport}/{comp_id}/{event_id}'
+
             result.append(
                 {
-                    'event_id': event['id'],
+                    'event_id': event_id,
+                    'link': link,
                     'competition': event['competitionName'],
-                    'sport': event['skName'],
+                    'sport': sk_name,
                     'start': event['startTimeTimestamp']
                     # стороны, коэффы и места в таблице добавляются позже
                 }
