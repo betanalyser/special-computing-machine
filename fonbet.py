@@ -25,11 +25,11 @@ REGEX_JSON = re.compile(
     re.DOTALL | re.IGNORECASE
 )
 
-NEED_SPORT_KINDS = ['Футбол', 'Хоккей', 'Баскетбол']
+NEED_SPORT_KINDS = ['Football', 'Hockey', 'Basketball']
 SPORT_TO_NAME = {
-    'Футбол': 'football',
-    'Хоккей': 'hockey',
-    'Баскетбол': 'basketball'
+    'Football': 'football',
+    'Hockey': 'hockey',
+    'Basketball': 'basketball'
 }
 
 # service ####
@@ -68,7 +68,7 @@ req_topEvents3 = Request(
     url=f'{URL_LINE}/line/topEvents3',
     params={
         'place': 'line',
-        'lang': 'rus',
+        'lang': 'eng',
         'sysId': 1,
         # 'salt': '1mnb3r7hefmjwf3r9he',
         # 'smartFilterId': 11  # id из smartFilters (подборки)
@@ -137,7 +137,7 @@ def actual_events(
     return result
 
 
-def get_match(event_id, url_sportradar=URL_SPORTRADAR, lang='ru'):
+def get_match(event_id, url_sportradar=URL_SPORTRADAR, lang='en'):
     url_match = f'{url_sportradar}/{lang}/match/m{event_id}'
     response = safe_request(Request(method='GET', url=url_match))
     return get_json(response)
