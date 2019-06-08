@@ -5,7 +5,7 @@ import json
 from lxml import html
 from requests import Request, Session
 from requests import Timeout, TooManyRedirects, RequestException
-
+from apscheduler.schedulers.background import BackgroundScheduler
 
 # constants ####
 
@@ -31,6 +31,8 @@ SPORT_TO_NAME = {
     'Hockey': 'hockey',
     'Basketball': 'basketball'
 }
+
+BIG_COEFF = 2.0
 
 # service ####
 
@@ -236,7 +238,7 @@ def teams_info(event_id, coeff_min=float('-inf'), coeff_max=float('inf')):
     home_weight = hometeam_data['weight']
     away_weight = awayteam_data['weight']
 
-    if coeff_max >= 2 and home_weight == away_weight:
+    if coeff_max >= BIG_COEFF and home_weight == away_weight:
         home_odds = target_odds_data['home']['value']
         away_odds = target_odds_data['away']['value']
         if home_odds > away_odds:
@@ -289,4 +291,53 @@ def actual_outcomes(
                 break
 
     result.sort(key=lambda event: event['winner']['odds'], reverse=True)
+    return result
+
+
+###
+
+
+EVENTS = None
+
+
+def update_events():
+    global EVENTS
+    if not EVENTS:
+        print('[UPDATE EVENTS] begin of receive events')
+        EVENTS = actual_outcomes()
+        print('[UPDATE EVENTS] events received')
+    else:
+        EVENTS = actual_outcomes()
+
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(
+    func=update_events,
+    trigger='interval',
+    minutes=1,
+    id='update_events'
+)
+update_events()
+scheduler.start(paused=True)
+
+
+def get_suitable_events(
+    coeff_min=float('-inf'), coeff_max=float('inf'),
+        count=float('inf'), sport_kinds=NEED_SPORT_KINDS):
+    result = []
+    n = 0
+    for event in EVENTS:
+        status = False
+        winner = event['winner']
+        if event['sport'] in sport_kinds:
+            if not winner['side'] and coeff_max >= BIG_COEFF:
+                status = True
+            elif winner['side'] and coeff_min <= winner['odds'] <= coeff_max:
+                status = True
+
+        if status:
+            result.append(event)
+            n += 1
+            if n >= count:
+                break
     return result
