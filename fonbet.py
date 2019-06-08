@@ -43,10 +43,8 @@ def safe_request(prepare_request, session=session, attempts=5, sleep=2):
             # time.sleep(sleep)
             pass
     else:
-        raise RuntimeError(f'invalid status code')
+        raise RuntimeError('invalid status code')
 
-
-###
 
 URL_FONBET = 'https://www.fonbet.ru'
 URL_SPORTRADAR = 'https://s5.sir.sportradar.com/fonbet'
@@ -85,37 +83,37 @@ def get_json(response, xpath_json=XPATH_JSON, regex=REGEX_JSON):
         return json.loads(json_str.group())
 
 
+def event_fits(event, sport_kinds, coeff_min, coeff_max):
+    if sport_kinds and event['skName'] not in sport_kinds:
+        return False
+    for market in event['markets']:
+        if market['ident'] == 'Results':  # Исходы
+            break
+    for row in market['rows']:
+        if 'isTitle' not in row:
+            for cell in row['cells']:
+                if 'isTitle' not in cell:
+                    value = cell.get('value')
+                    if value:
+                        if coeff_min <= value <= coeff_max:
+                            return True
+    return False
+
+
 def get_actual_events(
         coeff_min=float('-inf'), coeff_max=float('inf'),
         sport_kinds=NEED_SPORT_KINDS):
     '''
-    Получаем некоторые данные всех текущих ивентов с главной.
-    sports_kinds - фильтр в виде списка названий видов спорта
-        названия должны быть точными.
-        Можно указать None если хотим все ивенты.
+    Получаем первичные данные всех текущих ивентов с главной.
+    sports_kinds - фильтр в виде списка названий видов спорта на русском
+        названия должны быть точными. Можно указать None если хотим все ивенты.
     '''
-
-    def event_fits(event):
-        if sport_kinds and event['skName'] not in sport_kinds:
-            return False
-        for market in event['markets']:
-            if market['ident'] == 'Results':  # Исходы
-                break
-        for row in market['rows']:
-            if 'isTitle' not in row:
-                for cell in row['cells']:
-                    if 'isTitle' not in cell:
-                        value = cell.get('value')
-                        if value:
-                            if coeff_min <= value <= coeff_max:
-                                return True
-        return False
-
     response = safe_request(req_topEvents3)
     json_ = response.json()
     result = []
     for event in json_['events']:
-        if event_fits(event):
+        if event_fits(event, sport_kinds,
+                      coeff_min=coeff_min, coeff_max=coeff_max):
             result.append(
                 {
                     'event_id': event['id'],
@@ -130,12 +128,36 @@ def get_actual_events(
 
 def get_match(event_id, url_sportradar=URL_SPORTRADAR, lang='ru'):
     url_match = f'{url_sportradar}/{lang}/match/m{event_id}'
-    request = Request(method='GET', url=url_match)
-    response = safe_request(request)
+    response = safe_request(Request(method='GET', url=url_match))
     return get_json(response)
 
 
-def get_teams_info(event_id):
+def team_data(team_uid, matchdict):
+    target_field = f'stats_team_odds_client/{team_uid}'
+    teamdict = matchdict['fetchedData'][target_field]['data']['team']
+    need_fields_team = [
+        'name',
+        'mediumname',
+        'nickname',
+        'abbr',
+        'suffix',
+        'sex'
+    ]
+    result = {}
+    for field in need_fields_team:
+        result[field] = teamdict[field]
+    country_data = teamdict.get('cc')  # поля страны отдельно
+    if country_data:
+        country = {}
+        for field in ['name', 'a2', 'a3', 'ioc', 'continent']:
+            country[field] = country_data[field]
+    else:
+        country = None
+    result['country'] = country
+    return result
+
+
+def get_teams_info(event_id, coeff_min=float('-inf'), coeff_max=float('inf')):
     # возвращает None если данные о паре не найдены
     matchdict = get_match(event_id)
     if not matchdict['options']['h2hParamsInfo']:  # почему-то матч не найден
@@ -173,31 +195,8 @@ def get_teams_info(event_id):
 
     ###
 
-    def team_data(team_uid):
-        target_field = f'stats_team_odds_client/{team_uid}'
-        teamdict = matchdict['fetchedData'][target_field]['data']['team']
-        need_fields_team = [
-            'name',
-            'mediumname',
-            'nickname',
-            'abbr',
-            'suffix',
-            'sex'
-        ]
-        result = {}
-        for field in need_fields_team:
-            result[field] = teamdict[field]
-        # поля страны отдельно
-        country = {}
-        country_data = teamdict.get('cc')
-        if country_data:
-            for field in ['name', 'a2', 'a3', 'ioc', 'continent']:
-                country[field] = country_data[field]
-            result['country'] = country
-        return result
-
-    hometeam_data = team_data(hometeam_uid)
-    awayteam_data = team_data(awayteam_uid)
+    hometeam_data = {}
+    awayteam_data = {}
 
     target_field = f'stats_season_tables/{season}'
     target = matchdict['fetchedData'].get(target_field)
@@ -220,63 +219,67 @@ def get_teams_info(event_id):
             elif 'weight' in hometeam_data and 'weight' in awayteam_data:
                 status = True
                 break
-    if not status:
+    if not status:  # данных о команде почему-то нет в таблице
         return
+
+    ##########################################################################
+
+    home_weight = hometeam_data['weight']
+    away_weight = awayteam_data['weight']
+
+    if coeff_max >= 2 and home_weight == away_weight:
+        home_odds = target_odds_data['home']['value']
+        away_odds = target_odds_data['away']['value']
+        if home_odds > away_odds:
+            need_odds = home_odds
+        else:
+            need_odds = away_odds
+        # просто ставим наибольший коэфф
+        winner = {'side': None, 'odds': need_odds}
+
+    else:
+        if home_weight > away_weight:
+            side = 'home'
+        elif home_weight < away_weight:
+            side = 'away'
+        odds = target_odds_data[side]['value']
+        if coeff_min <= odds <= coeff_max:
+            winner = {'side': side, 'odds': odds}
+        else:
+            return
+
+    hometeam_data.update(team_data(hometeam_uid, matchdict))
+    awayteam_data.update(team_data(awayteam_uid, matchdict))
+
+    ##########################################################################
 
     return {
         'home': hometeam_data,
         'away': awayteam_data,
-        'odds': target_odds_data
+        'odds': target_odds_data,
+        'winner': winner
     }
 
 
 def get_actual_outcomes(
         coeff_min=float('-inf'), coeff_max=float('inf'),
-        sport_kinds=NEED_SPORT_KINDS, count=float('inf')):
+        count=float('inf'), sport_kinds=NEED_SPORT_KINDS):
 
     events = get_actual_events(
         coeff_min=coeff_min,
         coeff_max=coeff_max,
         sport_kinds=sport_kinds
     )
-    pre_result = []
+    result = []
     n = 0
     for event in events:
         teams_info = get_teams_info(event['event_id'])
         if teams_info:
             teams_info.update(event)
-            pre_result.append(teams_info)
+            result.append(teams_info)
             n += 1
             if n >= count:
                 break
-
-    # перенести в get_teams_info
-    result = []
-    for event in pre_result:
-        home_weight = event['home']['weight']
-        away_weight = event['away']['weight']
-
-        if coeff_max >= 2 and home_weight == away_weight:
-            odds_ = event['odds']
-            home_odds = odds_['home']['value']
-            away_odds = odds_['away']['value']
-            if home_odds > away_odds:
-                need_odds = home_odds
-            else:
-                need_odds = away_odds
-            # просто ставим наибольший коэфф
-            event['winner'] = {'side': None, 'odds': need_odds}
-            result.append(event)
-
-        else:
-            if home_weight > away_weight:
-                side = 'home'
-            elif home_weight < away_weight:
-                side = 'away'
-            odds = event['odds'][side]['value']
-            if coeff_min <= odds <= coeff_max:
-                event['winner'] = {'side': side, 'odds': odds}
-                result.append(event)
 
     result.sort(key=lambda event: event['winner']['odds'], reverse=True)
     return result
