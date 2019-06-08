@@ -1,6 +1,6 @@
 import re
 import json
-import time
+# import time
 
 from lxml import html
 from requests import Request, Session
@@ -138,8 +138,7 @@ def get_match(event_id, url_sportradar=URL_SPORTRADAR, lang='ru'):
 def get_teams_info(event_id):
     # возвращает None если данные о паре не найдены
     matchdict = get_match(event_id)
-    if not matchdict['options']['h2hParamsInfo']:
-        # если почему-то матч не найден
+    if not matchdict['options']['h2hParamsInfo']:  # почему-то матч не найден
         return
     params = matchdict['routing']['params']
     season = params['season']
@@ -166,6 +165,8 @@ def get_teams_info(event_id):
             value = odds[field].get(datatype)
             if value is not None:
                 value = float(value)
+            if datatype == 'odds':
+                datatype = 'value'
             tmp_dict[datatype] = value
         target_odds_data[field] = tmp_dict
     target_odds_data['type'] = type_
@@ -204,6 +205,7 @@ def get_teams_info(event_id):
         return
 
     tables = target['data']['tables']
+    status = False
     for table in tables:
         for row in table['tablerows']:
             team_uid = row['team']['uid']
@@ -216,7 +218,10 @@ def get_teams_info(event_id):
             elif team_uid == awayteam_uid:
                 awayteam_data['weight'] = weight
             elif 'weight' in hometeam_data and 'weight' in awayteam_data:
+                status = True
                 break
+    if not status:
+        return
 
     return {
         'home': hometeam_data,
@@ -234,14 +239,44 @@ def get_actual_outcomes(
         coeff_max=coeff_max,
         sport_kinds=sport_kinds
     )
-    result = []
+    pre_result = []
     n = 0
     for event in events:
         teams_info = get_teams_info(event['event_id'])
         if teams_info:
             teams_info.update(event)
-            result.append(teams_info)
+            pre_result.append(teams_info)
             n += 1
             if n >= count:
                 break
+
+    # перенести в get_teams_info
+    result = []
+    for event in pre_result:
+        home_weight = event['home']['weight']
+        away_weight = event['away']['weight']
+
+        if coeff_max >= 2 and home_weight == away_weight:
+            odds_ = event['odds']
+            home_odds = odds_['home']['value']
+            away_odds = odds_['away']['value']
+            if home_odds > away_odds:
+                need_odds = home_odds
+            else:
+                need_odds = away_odds
+            # просто ставим наибольший коэфф
+            event['winner'] = {'side': None, 'odds': need_odds}
+            result.append(event)
+
+        else:
+            if home_weight > away_weight:
+                side = 'home'
+            elif home_weight < away_weight:
+                side = 'away'
+            odds = event['odds'][side]['value']
+            if coeff_min <= odds <= coeff_max:
+                event['winner'] = {'side': side, 'odds': odds}
+                result.append(event)
+
+    result.sort(key=lambda event: event['winner']['odds'], reverse=True)
     return result
