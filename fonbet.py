@@ -100,7 +100,7 @@ def event_fits(event, sport_kinds, coeff_min, coeff_max):
     return False
 
 
-def get_actual_events(
+def actual_events(
         coeff_min=float('-inf'), coeff_max=float('inf'),
         sport_kinds=NEED_SPORT_KINDS):
     '''
@@ -157,7 +157,7 @@ def team_data(team_uid, matchdict):
     return result
 
 
-def get_teams_info(event_id, coeff_min=float('-inf'), coeff_max=float('inf')):
+def teams_info(event_id, coeff_min=float('-inf'), coeff_max=float('inf')):
     # возвращает None если данные о паре не найдены
     matchdict = get_match(event_id)
     if not matchdict['options']['h2hParamsInfo']:  # почему-то матч не найден
@@ -261,11 +261,11 @@ def get_teams_info(event_id, coeff_min=float('-inf'), coeff_max=float('inf')):
     }
 
 
-def get_actual_outcomes(
+def actual_outcomes(
         coeff_min=float('-inf'), coeff_max=float('inf'),
         count=float('inf'), sport_kinds=NEED_SPORT_KINDS):
 
-    events = get_actual_events(
+    events = actual_events(
         coeff_min=coeff_min,
         coeff_max=coeff_max,
         sport_kinds=sport_kinds
@@ -273,10 +273,10 @@ def get_actual_outcomes(
     result = []
     n = 0
     for event in events:
-        teams_info = get_teams_info(event['event_id'])
-        if teams_info:
-            teams_info.update(event)
-            result.append(teams_info)
+        info = teams_info(event['event_id'])
+        if info:
+            info.update(event)
+            result.append(info)
             n += 1
             if n >= count:
                 break
