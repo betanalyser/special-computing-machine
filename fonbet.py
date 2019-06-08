@@ -160,8 +160,8 @@ def team_data(team_uid, matchdict):
 def teams_info(event_id, coeff_min=float('-inf'), coeff_max=float('inf')):
     # возвращает None если данные о паре не найдены
     matchdict = get_match(event_id)
-    if not matchdict['options']['h2hParamsInfo']:  # почему-то матч не найден
-        return
+    if not matchdict['options']['h2hParamsInfo']:
+        return  # почему-то матч не найден
     params = matchdict['routing']['params']
     season = params['season']
     match_id = params['matchId']
@@ -201,7 +201,7 @@ def teams_info(event_id, coeff_min=float('-inf'), coeff_max=float('inf')):
     target_field = f'stats_season_tables/{season}'
     target = matchdict['fetchedData'].get(target_field)
     if not target:
-        return
+        return  # у матча нет таблицы
 
     tables = target['data']['tables']
     status = False
@@ -221,8 +221,6 @@ def teams_info(event_id, coeff_min=float('-inf'), coeff_max=float('inf')):
                 break
     if not status:  # данных о команде почему-то нет в таблице
         return
-
-    ##########################################################################
 
     home_weight = hometeam_data['weight']
     away_weight = awayteam_data['weight']
@@ -250,8 +248,6 @@ def teams_info(event_id, coeff_min=float('-inf'), coeff_max=float('inf')):
 
     hometeam_data.update(team_data(hometeam_uid, matchdict))
     awayteam_data.update(team_data(awayteam_uid, matchdict))
-
-    ##########################################################################
 
     return {
         'home': hometeam_data,
