@@ -35,7 +35,7 @@ users = {}
 supported_sport_events_ru_en = {'Футбол': supported_sport_events[0],
                                 'Баскетбол': supported_sport_events[1],
                                 'Хоккей': supported_sport_events[2]}
-event_message_template_3_way = """{sport_type} *{competition}*
+event_msg_template_3_way = """{sport_type} *{competition}*
 {home_name} ({home_abbr}) — {away_name} ({away_abbr})
 
 *Coefficients* 🧮
@@ -53,7 +53,7 @@ Coefficient: {winner_coefficient}
 
 📅 Event start date: {event_time}
 """
-event_message_template_2_way = """{sport_type} *{competition}*
+event_msg_template_2_way = """{sport_type} *{competition}*
 {home_name} ({home_abbr}) — {away_name} ({away_abbr})
 
 *Coefficients* 🧮

@@ -3,18 +3,17 @@ import config
 import telebot
 from telebot import apihelper, types
 import data
-from fonbet import get_suitable_events
 from datetime import datetime
 import pickle
 from apscheduler.schedulers.background import BackgroundScheduler
-from translate import Translator
+import os.path
 import proxy
+from fonbet import get_suitable_events
 
 apihelper.proxy = proxy.PROXY
 
 
 bot = telebot.TeleBot(config.token)
-translator = Translator(from_lang='ru', to_lang='en', provider='mymemory')
 
 
 def dump_users_data(users_data):
@@ -22,8 +21,16 @@ def dump_users_data(users_data):
         pickle.dump(users_data, f)
 
 
+def is_users_data_file_exists(path):
+    return os.path.exists(path=path)
+
+
 def load_users_data():
-    with open('users.pickle', 'rb') as f:
+    path = 'users.pickle'
+    if not is_users_data_file_exists(path):
+        with open(path, 'wb') as f:
+            pickle.dump(data.users, f)
+    with open(path, 'rb') as f:
         return pickle.load(f)
 
 
@@ -31,9 +38,13 @@ def send_events(chat_id, events):
     for event in events:
         try:
             keyboard = types.InlineKeyboardMarkup()
-            url_button = types.InlineKeyboardButton(text=data.GO_TO_THE_EVENT_PAGE, url=event['EventLink'])
+            url_button = types.InlineKeyboardButton(
+                text=data.GO_TO_THE_EVENT_PAGE,
+                url=event['EventLink'])
             keyboard.add(url_button)
-            bot.send_message(chat_id, event['Message'], reply_markup=keyboard, parse_mode='Markdown')
+            bot.send_message(chat_id, event['Message'],
+                             reply_markup=keyboard,
+                             parse_mode='Markdown')
         except ConnectionError as exception:
             raise exception
 
@@ -46,15 +57,19 @@ def parse_events(for_all=True, message=''):
     for user in dbase:
         messages_for_send = []
         if data.users[user]['State'] == 4:
-            for event in get_suitable_events(coeff_min=data.users[user]['EnteredCoefficients'][0],
-                                             coeff_max=data.users[user]['EnteredCoefficients'][1],
-                                             sport_kinds=[sport[0].split(' ')[0]
-                                                          for sport in data.users[user]['SelectedSports'].items()
-                                                          if sport[1]]):
+            for event in get_suitable_events(
+                    coeff_min=data.users[user]['EnteredCoefficients'][0],
+                    coeff_max=data.users[user]['EnteredCoefficients'][1],
+                    sport_kinds=[sport[0].split(' ')[0]
+                                 for sport in data.users[user]['SelectedSports']
+                                         .items()
+                                 if sport[1]]):
                 if event['winner']['side'] is not None:
                     if event['odds']['type'] == '3way':
-                        current_message = data.event_message_template_3_way.format(
-                                sport_type=data.supported_sport_events_emoji[event['sport']],
+                        current_message = data.event_msg_template_3_way.format(
+                                sport_type=data.supported_sport_events_emoji[
+                                    event['sport']
+                                ],
                                 competition=event['competition'],
                                 home_name=event['home']['name'],
                                 home_abbr=event['home']['abbr'],
@@ -65,13 +80,18 @@ def parse_events(for_all=True, message=''):
                                 draw_chance=event['odds']['draw']['value'],
                                 home_weight=event['home']['weight'],
                                 away_weight=event['away']['weight'],
-                                winner_name=event[event['winner']['side']]['name'],
+                                winner_name=event[event['winner']['side']]
+                                ['name'],
                                 winner_coefficient=event['winner']['odds'],
-                                event_time=datetime.utcfromtimestamp(event['start']).strftime('%H:%M %d/%m/%Y'),
-                                )
+                                event_time=datetime.utcfromtimestamp(
+                                    event['start']
+                                ).strftime('%H:%M %d/%m/%Y'),
+                        )
                     else:
-                        current_message = data.event_message_template_2_way.format(
-                                sport_type=data.supported_sport_events_emoji[event['sport']],
+                        current_message = data.event_msg_template_2_way.format(
+                                sport_type=data.supported_sport_events_emoji[
+                                    event['sport']
+                                ],
                                 competition=event['competition'],
                                 home_name=event['home']['name'],
                                 home_abbr=event['home']['abbr'],
@@ -81,11 +101,18 @@ def parse_events(for_all=True, message=''):
                                 away_chance=event['odds']['away']['value'],
                                 home_weight=event['home']['weight'],
                                 away_weight=event['away']['weight'],
-                                winner_name=event[event['winner']['side']]['name'],
+                                winner_name=event[event['winner']['side']]
+                                ['name'],
                                 winner_coefficient=event['winner']['odds'],
-                                event_time=datetime.utcfromtimestamp(event['start']).strftime('%H:%M %d/%m/%Y'),
-                                )
-                    messages_for_send.append({'Message': current_message, 'EventLink': event['link']})
+                                event_time=datetime.utcfromtimestamp(
+                                    event['start']
+                                ).strftime('%H:%M %d/%m/%Y'),
+                        )
+                    messages_for_send.append(
+                        {
+                            'Message': current_message,
+                            'EventLink': event['link']
+                         })
             if not for_all and len(messages_for_send) == 0:
                 bot.send_message(message.chat.id, data.DO_NOT_WORRY)
             else:
@@ -104,9 +131,11 @@ def set_user(message):
 
 
 def reset_user_data(message):
-    data.users[message.chat.id]['SelectedSports'] = {data.supported_sport_events[0]: False,
-                                                     data.supported_sport_events[1]: False,
-                                                     data.supported_sport_events[2]: False}
+    data.users[message.chat.id]['SelectedSports'] = {
+        data.supported_sport_events[0]: False,
+        data.supported_sport_events[1]: False,
+        data.supported_sport_events[2]: False
+    }
     data.users[message.chat.id]['EnteredCoefficients'] = [0.0, 0.0]
 
 
@@ -139,7 +168,9 @@ def third_stage(message):
 
 def fourth_stage(message):
     data.users[message.chat.id]['State'] = 4
-    data.users[message.chat.id]['EnteredCoefficients'] = sorted(data.users[message.chat.id]['EnteredCoefficients'])
+    data.users[message.chat.id]['EnteredCoefficients'] = sorted(
+        data.users[message.chat.id]['EnteredCoefficients']
+    )
     keyboard = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
     reset = types.KeyboardButton(text=data.RESET_PARAMETERS)
     keyboard.add(reset)
@@ -148,9 +179,14 @@ def fourth_stage(message):
                          data.EXCELLENT_SEARCHING
                          .format(
                              sport_types=', '.join([sport[0] for sport in
-                                                    data.users[message.chat.id]['SelectedSports'].items() if sport[1]]),
-                             min_coeff=data.users[message.chat.id]['EnteredCoefficients'][0],
-                             max_coeff=data.users[message.chat.id]['EnteredCoefficients'][1]
+                                                    data.
+                                                   users[message.chat.id]
+                                                    ['SelectedSports']
+                                                   .items() if sport[1]]),
+                             min_coeff=data
+                             .users[message.chat.id]['EnteredCoefficients'][0],
+                             max_coeff=data
+                             .users[message.chat.id]['EnteredCoefficients'][1]
                          ),
                          reply_markup=keyboard,
                          parse_mode='Markdown')
@@ -159,7 +195,7 @@ def fourth_stage(message):
     parse_events(for_all=False, message=message)
 
 
-def flip_sport_type(message, sport_name):
+def f_sport_kind(message, sport_name):
     if not data.users[message.chat.id]['SelectedSports'][sport_name]:
         return True
     else:
@@ -193,7 +229,9 @@ def configurating_keyboard(message):
     keyboard = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
     for sport_name in data.supported_sport_events:
         if data.users[message.chat.id]['SelectedSports'][sport_name]:
-            sport = types.KeyboardButton(text='{} {}'.format(data.CHECKED_EMOJI, sport_name))
+            sport = types.KeyboardButton(text='{} {}'.format(
+                data.CHECKED_EMOJI,
+                sport_name))
             keyboard.add(sport)
         else:
             sport = types.KeyboardButton(text=sport_name)
@@ -211,7 +249,13 @@ def coefficient_keyboard():
         keyboard_row.append(types.KeyboardButton(text=str(coefficient/10)))
         n += 1
         if n % 5 == 0:
-            keyboard.row(keyboard_row[0], keyboard_row[1], keyboard_row[2], keyboard_row[3], keyboard_row[4])
+            keyboard.row(
+                keyboard_row[0],
+                keyboard_row[1],
+                keyboard_row[2],
+                keyboard_row[3],
+                keyboard_row[4]
+            )
             keyboard_row = []
             n = 0
     keyboard.row(types.KeyboardButton(text=data.DOES_NOT_MATTER))
@@ -225,7 +269,9 @@ def send_welcome(message):
     set_user(message)
     try:
         bot.send_message(message.chat.id,
-                         data.WELCOME_MESSAGE.format(bot.get_chat(message.chat.id).first_name))
+                         data.WELCOME_MESSAGE.format(
+                             bot.get_chat(message.chat.id).first_name)
+                         )
     except ConnectionError as exception:
         raise exception
     second_stage(message)
@@ -256,13 +302,19 @@ def parse_coefficients(message):
         reset_user_data(message)
         second_stage(message)
     else:
-        if check_coefficient(message.text) or message.text == data.DOES_NOT_MATTER:
+        if (check_coefficient(message.text) or
+                message.text == data.DOES_NOT_MATTER):
             msg = message.text
             if not any(data.users[message.chat.id]['EnteredCoefficients']):
                 if msg == data.DOES_NOT_MATTER:
                     msg = data.NEGATIVE_INFINITY
-                data.users[message.chat.id]['EnteredCoefficients'][0] = float(msg)
-                keyboard = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
+                data.users[message.chat.id]['EnteredCoefficients'][0] = float(
+                    msg
+                )
+                keyboard = types.ReplyKeyboardMarkup(
+                    row_width=1,
+                    resize_keyboard=True
+                )
                 cancel = types.KeyboardButton(text=data.CANCEL)
                 keyboard.add(cancel)
                 try:
@@ -274,7 +326,9 @@ def parse_coefficients(message):
             else:
                 if msg == data.DOES_NOT_MATTER:
                     msg = data.POSITIVE_INFINITY
-                data.users[message.chat.id]['EnteredCoefficients'][1] = float(msg)
+                data.users[message.chat.id]['EnteredCoefficients'][1] = float(
+                    msg
+                )
                 fourth_stage(message)
         else:
             try:
@@ -296,7 +350,9 @@ def choosing_sports(message):
                              reply_markup=configurating_keyboard(message))
     else:
         if msg in data.supported_sport_events:
-            data.users[message.chat.id]['SelectedSports'][msg] = flip_sport_type(message, msg)
+            data.users[message.chat.id]['SelectedSports'][msg] = f_sport_kind(
+                message, msg
+            )
             try:
                 bot.send_message(message.chat.id,
                                  data.ON_CHOOSING_SPORT,
@@ -306,10 +362,10 @@ def choosing_sports(message):
 
 
 if __name__ == '__main__':
+    data.users = load_users_data()
+    set_schedulers()
     while True:
-        data.users = load_users_data()
-        set_schedulers()
         try:
             bot.polling(none_stop=True)
-        except ConnectionError as e:
-            raise e
+        except ConnectionError:
+            pass
