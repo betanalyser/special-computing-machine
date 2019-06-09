@@ -61,58 +61,59 @@ def parse_events(for_all=True, message=''):
                     coeff_min=data.users[user]['EnteredCoefficients'][0],
                     coeff_max=data.users[user]['EnteredCoefficients'][1],
                     sport_kinds=[sport[0].split(' ')[0]
-                                 for sport in data.users[user]['SelectedSports']
+                                 for sport in data
+                                         .users[user]['SelectedSports']
                                          .items()
                                  if sport[1]]):
                 if event['winner']['side'] is not None:
                     if event['odds']['type'] == '3way':
                         current_message = data.event_msg_template_3_way.format(
-                                sport_type=data.supported_sport_events_emoji[
-                                    event['sport']
-                                ],
-                                competition=event['competition'],
-                                home_name=event['home']['name'],
-                                home_abbr=event['home']['abbr'],
-                                away_name=event['away']['name'],
-                                away_abbr=event['away']['abbr'],
-                                home_chance=event['odds']['home']['value'],
-                                away_chance=event['odds']['away']['value'],
-                                draw_chance=event['odds']['draw']['value'],
-                                home_weight=event['home']['weight'],
-                                away_weight=event['away']['weight'],
-                                winner_name=event[event['winner']['side']]
-                                ['name'],
-                                winner_coefficient=event['winner']['odds'],
-                                event_time=datetime.utcfromtimestamp(
-                                    event['start']
-                                ).strftime('%H:%M %d/%m/%Y'),
+                            sport_type=data.supported_sport_events_emoji[
+                                event['sport']
+                            ],
+                            competition=event['competition'],
+                            home_name=event['home']['name'],
+                            home_abbr=event['home']['abbr'],
+                            away_name=event['away']['name'],
+                            away_abbr=event['away']['abbr'],
+                            home_chance=event['odds']['home']['value'],
+                            away_chance=event['odds']['away']['value'],
+                            draw_chance=event['odds']['draw']['value'],
+                            home_weight=event['home']['weight'],
+                            away_weight=event['away']['weight'],
+                            winner_name=event[event['winner']['side']]
+                            ['name'],
+                            winner_coefficient=event['winner']['odds'],
+                            event_time=datetime.utcfromtimestamp(
+                                event['start']
+                            ).strftime('%H:%M %d/%m/%Y'),
                         )
                     else:
                         current_message = data.event_msg_template_2_way.format(
-                                sport_type=data.supported_sport_events_emoji[
-                                    event['sport']
-                                ],
-                                competition=event['competition'],
-                                home_name=event['home']['name'],
-                                home_abbr=event['home']['abbr'],
-                                away_name=event['away']['name'],
-                                away_abbr=event['away']['abbr'],
-                                home_chance=event['odds']['home']['value'],
-                                away_chance=event['odds']['away']['value'],
-                                home_weight=event['home']['weight'],
-                                away_weight=event['away']['weight'],
-                                winner_name=event[event['winner']['side']]
-                                ['name'],
-                                winner_coefficient=event['winner']['odds'],
-                                event_time=datetime.utcfromtimestamp(
-                                    event['start']
-                                ).strftime('%H:%M %d/%m/%Y'),
+                            sport_type=data.supported_sport_events_emoji[
+                                event['sport']
+                            ],
+                            competition=event['competition'],
+                            home_name=event['home']['name'],
+                            home_abbr=event['home']['abbr'],
+                            away_name=event['away']['name'],
+                            away_abbr=event['away']['abbr'],
+                            home_chance=event['odds']['home']['value'],
+                            away_chance=event['odds']['away']['value'],
+                            home_weight=event['home']['weight'],
+                            away_weight=event['away']['weight'],
+                            winner_name=event[event['winner']['side']]
+                            ['name'],
+                            winner_coefficient=event['winner']['odds'],
+                            event_time=datetime.utcfromtimestamp(
+                                event['start']
+                            ).strftime('%H:%M %d/%m/%Y'),
                         )
                     messages_for_send.append(
                         {
                             'Message': current_message,
                             'EventLink': event['link']
-                         })
+                        })
             if not for_all and len(messages_for_send) == 0:
                 bot.send_message(message.chat.id, data.DO_NOT_WORRY)
             else:
@@ -246,7 +247,7 @@ def coefficient_keyboard():
     n = 0
     keyboard_row = []
     for coefficient in range(10, 30, 2):
-        keyboard_row.append(types.KeyboardButton(text=str(coefficient/10)))
+        keyboard_row.append(types.KeyboardButton(text=str(coefficient / 10)))
         n += 1
         if n % 5 == 0:
             keyboard.row(
