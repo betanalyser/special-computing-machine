@@ -179,15 +179,21 @@ def fourth_stage(message):
         bot.send_message(message.chat.id,
                          data.EXCELLENT_SEARCHING
                          .format(
-                             sport_types=', '.join([sport[0] for sport in
-                                                    data.
-                                                   users[message.chat.id]
-                                                    ['SelectedSports']
-                                                   .items() if sport[1]]),
-                             min_coeff=data
-                             .users[message.chat.id]['EnteredCoefficients'][0],
-                             max_coeff=data
-                             .users[message.chat.id]['EnteredCoefficients'][1]
+                             sport_types='\n - ' + '\n - '
+                                .join([sport[0] for sport in data.
+                                      users[message.chat.id]
+                                      ['SelectedSports']
+                                       .items() if sport[1]]),
+                             min_coeff=str(data
+                                           .users[message.chat.id]
+                                           ['EnteredCoefficients'][0]).replace(
+                                 'inf', '∞'
+                                ),
+                             max_coeff=str(data
+                                           .users[message.chat.id]
+                                           ['EnteredCoefficients'][1]).replace(
+                                 'inf', '∞'
+                                )
                          ),
                          reply_markup=keyboard,
                          parse_mode='Markdown')
@@ -230,7 +236,7 @@ def configurating_keyboard(message):
     keyboard = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
     for sport_name in data.supported_sport_events:
         if data.users[message.chat.id]['SelectedSports'][sport_name]:
-            sport = types.KeyboardButton(text='{} {}'.format(
+            sport = types.KeyboardButton(text='{}{}'.format(
                 data.CHECKED_EMOJI,
                 sport_name))
             keyboard.add(sport)
@@ -274,7 +280,7 @@ def send_welcome(message):
                              bot.get_chat(message.chat.id).first_name)
                          )
     except ConnectionError as exception:
-        raise exception
+        print(exception)
     second_stage(message)
 
 
