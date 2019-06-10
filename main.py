@@ -230,6 +230,7 @@ def set_schedulers():
         trigger='interval',
         minutes=5
     )
+    scheduler.start()
 
 
 def configurating_keyboard(message):
