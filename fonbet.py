@@ -318,7 +318,7 @@ scheduler.add_job(
     id='update_events'
 )
 update_events()
-scheduler.start(paused=True)
+scheduler.start()
 
 
 def get_suitable_events(
