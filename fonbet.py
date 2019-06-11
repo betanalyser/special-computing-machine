@@ -1,6 +1,6 @@
 import re
 import json
-# import time
+import time
 
 from lxml import html
 from requests import Request, Session
@@ -37,7 +37,7 @@ BIG_COEFF = 2.0
 # service ####
 
 
-def safe_request(prepare_request, session=session, attempts=5, sleep=2):
+def safe_request(prepare_request, session=session, attempts=5, sleep=5):
     for attemp in range(attempts):
         try:
             response = session.send(
@@ -46,8 +46,7 @@ def safe_request(prepare_request, session=session, attempts=5, sleep=2):
             if response.status_code == 200:
                 return response
         except (Timeout, TooManyRedirects, RequestException):
-            # time.sleep(sleep)
-            pass
+            time.sleep(sleep)
     else:
         raise RuntimeError('invalid status code')
 
