@@ -65,55 +65,57 @@ def parse_events(for_all=True, message=''):
                                          .users[user]['SelectedSports']
                                          .items()
                                  if sport[1]]):
-                if event['winner']['side'] is not None:
-                    if event['odds']['type'] == '3way':
-                        current_message = data.event_msg_template_3_way.format(
-                            sport_type=data.supported_sport_events_emoji[
-                                event['sport']
-                            ],
-                            competition=event['competition'],
-                            home_name=event['home']['name'],
-                            home_abbr=event['home']['abbr'],
-                            away_name=event['away']['name'],
-                            away_abbr=event['away']['abbr'],
-                            home_chance=event['odds']['home']['value'],
-                            away_chance=event['odds']['away']['value'],
-                            draw_chance=event['odds']['draw']['value'],
-                            home_weight=event['home']['weight'],
-                            away_weight=event['away']['weight'],
-                            winner_name=event[event['winner']['side']]
-                            ['name'],
-                            winner_coefficient=event['winner']['odds'],
-                            event_time=datetime.utcfromtimestamp(
-                                event['start']
-                            ).strftime('%H:%M %d/%m/%Y'),
-                        )
-                    else:
-                        current_message = data.event_msg_template_2_way.format(
-                            sport_type=data.supported_sport_events_emoji[
-                                event['sport']
-                            ],
-                            competition=event['competition'],
-                            home_name=event['home']['name'],
-                            home_abbr=event['home']['abbr'],
-                            away_name=event['away']['name'],
-                            away_abbr=event['away']['abbr'],
-                            home_chance=event['odds']['home']['value'],
-                            away_chance=event['odds']['away']['value'],
-                            home_weight=event['home']['weight'],
-                            away_weight=event['away']['weight'],
-                            winner_name=event[event['winner']['side']]
-                            ['name'],
-                            winner_coefficient=event['winner']['odds'],
-                            event_time=datetime.utcfromtimestamp(
-                                event['start']
-                            ).strftime('%H:%M %d/%m/%Y'),
-                        )
-                    messages_for_send.append(
-                        {
-                            'Message': current_message,
-                            'EventLink': event['link']
-                        })
+                if not event['winner']['side'] is None:
+                    winner_name = event[event['winner']['side']]['name']
+                else:
+                    winner_name = 'Draw'
+                winner_coefficient = event['winner']['odds']
+                if event['odds']['type'] == '3way':
+                    current_message = data.event_msg_template_3_way.format(
+                        sport_type=data.supported_sport_events_emoji[
+                            event['sport']
+                        ],
+                        competition=event['competition'],
+                        home_name=event['home']['name'],
+                        home_abbr=event['home']['abbr'],
+                        away_name=event['away']['name'],
+                        away_abbr=event['away']['abbr'],
+                        home_chance=event['odds']['home']['value'],
+                        away_chance=event['odds']['away']['value'],
+                        draw_chance=event['odds']['draw']['value'],
+                        home_weight=event['home']['weight'],
+                        away_weight=event['away']['weight'],
+                        winner_name=winner_name,
+                        winner_coefficient=winner_coefficient,
+                        event_time=datetime.utcfromtimestamp(
+                            event['start']
+                        ).strftime('%H:%M %d/%m/%Y'),
+                    )
+                else:
+                    current_message = data.event_msg_template_2_way.format(
+                        sport_type=data.supported_sport_events_emoji[
+                            event['sport']
+                        ],
+                        competition=event['competition'],
+                        home_name=event['home']['name'],
+                        home_abbr=event['home']['abbr'],
+                        away_name=event['away']['name'],
+                        away_abbr=event['away']['abbr'],
+                        home_chance=event['odds']['home']['value'],
+                        away_chance=event['odds']['away']['value'],
+                        home_weight=event['home']['weight'],
+                        away_weight=event['away']['weight'],
+                        winner_name=winner_name,
+                        winner_coefficient=winner_coefficient,
+                        event_time=datetime.utcfromtimestamp(
+                            event['start']
+                        ).strftime('%H:%M %d/%m/%Y'),
+                    )
+                messages_for_send.append(
+                    {
+                        'Message': current_message,
+                        'EventLink': event['link']
+                    })
             if not for_all and len(messages_for_send) == 0:
                 bot.send_message(message.chat.id, data.DO_NOT_WORRY)
             else:
