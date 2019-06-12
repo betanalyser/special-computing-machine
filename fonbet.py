@@ -181,7 +181,10 @@ def teams_info(event_id, coeff_min=float('-inf'), coeff_max=float('inf')):
     awayteam_uid = int(params['awayTeamUid'])
 
     target_field = f'stats_team_odds_client/{hometeam_uid}'
-    data = matchdict['fetchedData'][target_field]['data']
+    fetched_data = matchdict['fetchedData']
+    if target_field not in fetched_data:
+        return
+    data = data[target_field]['data']
 
     odds_list = data['odds'][match_id]
     for odds in odds_list:  # находим нужный словарь исходов
