@@ -184,7 +184,7 @@ def teams_info(event_id, coeff_min=float('-inf'), coeff_max=float('inf')):
     fetched_data = matchdict['fetchedData']
     if target_field not in fetched_data:
         return
-    data = data[target_field]['data']
+    data = fetched_data[target_field]['data']
 
     odds_list = data['odds'][match_id]
     for odds in odds_list:  # находим нужный словарь исходов
