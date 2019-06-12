@@ -77,3 +77,5 @@ Coefficient: {winner_coefficient}
 
 📅 Event start date: {event_time} UTC
 """
+
+ATTEMPTS = 5
