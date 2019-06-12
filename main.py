@@ -273,12 +273,12 @@ def send_welcome(message):
                              data.WELCOME_MESSAGE.format(
                                  bot.get_chat(message.chat.id).first_name)
                              )
+            second_stage(message)
             return
         except ConnectionError:
             pass
     else:
         raise ConnectionError
-    second_stage(message)
 
 
 @bot.message_handler(content_types=['text'])
