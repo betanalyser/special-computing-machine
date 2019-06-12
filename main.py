@@ -36,17 +36,14 @@ def load_users_data():
 
 def send_events(chat_id, events):
     for event in events:
-        try:
-            keyboard = types.InlineKeyboardMarkup()
-            url_button = types.InlineKeyboardButton(
-                text=data.GO_TO_THE_EVENT_PAGE,
-                url=event['EventLink'])
-            keyboard.add(url_button)
-            bot.send_message(chat_id, event['Message'],
-                             reply_markup=keyboard,
-                             parse_mode='Markdown')
-        except ConnectionError as exception:
-            raise exception
+        keyboard = types.InlineKeyboardMarkup()
+        url_button = types.InlineKeyboardButton(
+            text=data.GO_TO_THE_EVENT_PAGE,
+            url=event['EventLink'])
+        keyboard.add(url_button)
+        bot.send_message(chat_id, event['Message'],
+                         reply_markup=keyboard,
+                         parse_mode='Markdown')
 
 
 def parse_events(for_all=True, message=''):
@@ -150,23 +147,19 @@ def second_stage(message):
         keyboard.add(sport)
     button = types.KeyboardButton(text=data.DONE)
     keyboard.add(button)
-    try:
-        bot.send_message(message.chat.id,
-                         data.WHAT_SPORTS_INTEREST_YOU,
-                         reply_markup=keyboard)
-    except ConnectionError as exception:
-        raise exception
+
+    bot.send_message(message.chat.id,
+                     data.WHAT_SPORTS_INTEREST_YOU,
+                     reply_markup=keyboard)
 
 
 def third_stage(message):
     data.users[message.chat.id]['State'] = 3
-    try:
-        bot.send_message(message.chat.id,
-                         data.OK_TEXT_COEFFICIENTS_1,
-                         reply_markup=coefficient_keyboard(),
-                         parse_mode='Markdown')
-    except ConnectionError as exception:
-        raise exception
+
+    bot.send_message(message.chat.id,
+                     data.OK_TEXT_COEFFICIENTS_1,
+                     reply_markup=coefficient_keyboard(),
+                     parse_mode='Markdown')
 
 
 def fourth_stage(message):
@@ -177,30 +170,27 @@ def fourth_stage(message):
     keyboard = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
     reset = types.KeyboardButton(text=data.RESET_PARAMETERS)
     keyboard.add(reset)
-    try:
-        bot.send_message(message.chat.id,
-                         data.EXCELLENT_SEARCHING
-                         .format(
-                             sport_types='\n - ' + '\n - '
-                                .join([sport[0] for sport in data.
-                                      users[message.chat.id]
-                                      ['SelectedSports']
-                                       .items() if sport[1]]),
-                             min_coeff=str(data
-                                           .users[message.chat.id]
-                                           ['EnteredCoefficients'][0]).replace(
-                                 'inf', '∞'
-                                ),
-                             max_coeff=str(data
-                                           .users[message.chat.id]
-                                           ['EnteredCoefficients'][1]).replace(
-                                 'inf', '∞'
-                                )
-                         ),
-                         reply_markup=keyboard,
-                         parse_mode='Markdown')
-    except ConnectionError as exception:
-        raise exception
+    bot.send_message(
+        message.chat.id,
+        data.EXCELLENT_SEARCHING.format(
+            sport_types='\n - ' + '\n - '.join(
+                [
+                    sport[0] for sport in data.users[
+                        message.chat.id]['SelectedSports'].items()
+                    if sport[1]
+                ]
+            ),
+            min_coeff=str(
+                data.users[message.chat.id]['EnteredCoefficients'][0]
+            ).replace('inf', '∞'),
+            max_coeff=str(
+                data.users[message.chat.id]['EnteredCoefficients'][1]
+            ).replace('inf', '∞')
+        ),
+        reply_markup=keyboard,
+        parse_mode='Markdown'
+    )
+
     parse_events(for_all=False, message=message)
 
 
@@ -277,25 +267,36 @@ def coefficient_keyboard():
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     set_user(message)
-    try:
-        bot.send_message(message.chat.id,
-                         data.WELCOME_MESSAGE.format(
-                             bot.get_chat(message.chat.id).first_name)
-                         )
-    except ConnectionError as exception:
-        print(exception)
+    for i in range(data.ATTEMPTS):
+        try:
+            bot.send_message(message.chat.id,
+                             data.WELCOME_MESSAGE.format(
+                                 bot.get_chat(message.chat.id).first_name)
+                             )
+            return
+        except ConnectionError:
+            pass
+    else:
+        raise ConnectionError
     second_stage(message)
 
 
 @bot.message_handler(content_types=['text'])
 def users_distribution(message):
     if message.chat.id in data.users:
-        if data.users[message.chat.id]['State'] == 2:
-            choosing_sports(message)
-        elif data.users[message.chat.id]['State'] == 3:
-            parse_coefficients(message)
-        elif data.users[message.chat.id]['State'] == 4:
-            events_streaming(message)
+        for i in range(data.ATTEMPTS):
+            try:
+                if data.users[message.chat.id]['State'] == 2:
+                    choosing_sports(message)
+                elif data.users[message.chat.id]['State'] == 3:
+                    parse_coefficients(message)
+                elif data.users[message.chat.id]['State'] == 4:
+                    events_streaming(message)
+                return
+            except ConnectionError:
+                pass
+        else:
+            raise ConnectionError
     else:
         set_user(message)
         second_stage(message)
@@ -327,12 +328,9 @@ def parse_coefficients(message):
                 )
                 cancel = types.KeyboardButton(text=data.CANCEL)
                 keyboard.add(cancel)
-                try:
-                    bot.send_message(message.chat.id,
-                                     data.OK_TEXT_COEFFICIENTS_2,
-                                     reply_markup=coefficient_keyboard())
-                except ConnectionError as exception:
-                    raise exception
+                bot.send_message(message.chat.id,
+                                 data.OK_TEXT_COEFFICIENTS_2,
+                                 reply_markup=coefficient_keyboard())
             else:
                 if msg == data.DOES_NOT_MATTER:
                     msg = data.POSITIVE_INFINITY
@@ -341,12 +339,9 @@ def parse_coefficients(message):
                 )
                 fourth_stage(message)
         else:
-            try:
-                bot.send_message(message.chat.id,
-                                 data.INVALID_COEFFICIENTS,
-                                 reply_markup=coefficient_keyboard())
-            except ConnectionError as exception:
-                raise exception
+            bot.send_message(message.chat.id,
+                             data.INVALID_COEFFICIENTS,
+                             reply_markup=coefficient_keyboard())
 
 
 def choosing_sports(message):
@@ -363,12 +358,9 @@ def choosing_sports(message):
             data.users[message.chat.id]['SelectedSports'][msg] = f_sport_kind(
                 message, msg
             )
-            try:
-                bot.send_message(message.chat.id,
-                                 data.ON_CHOOSING_SPORT,
-                                 reply_markup=configurating_keyboard(message))
-            except ConnectionError as exception:
-                raise exception
+            bot.send_message(message.chat.id,
+                             data.ON_CHOOSING_SPORT,
+                             reply_markup=configurating_keyboard(message))
 
 
 if __name__ == '__main__':
