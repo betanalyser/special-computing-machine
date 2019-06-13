@@ -272,6 +272,104 @@ def teams_info(event_id, coeff_min=float('-inf'), coeff_max=float('inf')):
     }
 
 
+def teams_info_2(event_id, coeff_min=float('-inf'), coeff_max=float('inf')):
+    # возвращает None если данные о паре не найдены
+    matchdict = get_match(event_id)
+    if not matchdict['options']['h2hParamsInfo']:
+        return  # почему-то матч не найден
+    params = matchdict['routing']['params']
+    season = params['season']
+
+    parsed_data = matchdict['parsedData'].get('Scoreboard')
+    if not parsed_data:
+        return
+    for key in parsed_data:
+        if key.startswith(f'{season}_'):
+            break
+    else:
+        return  # не нашли данных
+    data = parsed_data[key]
+
+    odds_list = data['match']['odds']['odds']
+    for odds in odds_list:  # находим нужный словарь исходов
+        if odds['type'] in ['2way', '3way']:
+            break
+
+    target_odds_data = {}
+    type_ = odds['type']
+    need_fields_odds = ['home', 'away']
+    if type_ == '3way':
+        need_fields_odds.append('draw')
+    for field in need_fields_odds:
+        tmp_dict = {}
+        for datatype in ['odds', 'change']:
+            value = odds[field].get(datatype)
+            if value is not None:
+                value = float(value)
+            if datatype == 'odds':
+                datatype = 'value'
+            tmp_dict[datatype] = value
+        target_odds_data[field] = tmp_dict
+    target_odds_data['type'] = type_
+
+    ###
+
+    hometeam_data = {}
+    awayteam_data = {}
+
+    probabilities = matchdict['parsedData']['WinProbability']
+    for key in probabilities:
+        if key.startswith(f'{season}_'):
+            break  # находим нужный нам ключ
+    else:
+        return  # нужного ключа нет
+    win_probability = probabilities[key]
+
+    hometeam_data['weight'] = win_probability['home']
+    awayteam_data['weight'] = win_probability['away']
+
+    home_weight = hometeam_data['weight']
+    away_weight = awayteam_data['weight']
+
+    if coeff_max >= BIG_COEFF and home_weight == away_weight:
+        home_odds = target_odds_data['home']['value']
+        away_odds = target_odds_data['away']['value']
+        if home_odds > away_odds:
+            need_odds = home_odds
+        else:
+            need_odds = away_odds
+        # просто ставим наибольший коэфф
+        winner = {'side': None, 'odds': need_odds}
+
+    else:
+        if home_weight > away_weight:
+            side = 'home'
+        elif home_weight < away_weight:
+            side = 'away'
+        odds = target_odds_data[side]['value']
+        if coeff_min <= odds <= coeff_max:
+            winner = {'side': side, 'odds': odds}
+        else:
+            return
+
+    teams_data = data['uniqueTeams']
+
+    tdh = teams_data['home']
+    tdh['country'] = tdh.get('cc')
+    hometeam_data.update(tdh)
+
+    tda = teams_data['away']
+    tda['country'] = tda.get('cc')
+    awayteam_data.update(tda)
+
+    return {
+        'home': hometeam_data,
+        'away': awayteam_data,
+        'odds': target_odds_data,
+        'winner': winner
+    }
+
+
 def actual_outcomes(
         coeff_min=float('-inf'), coeff_max=float('inf'),
         count=float('inf'), sport_kinds=NEED_SPORT_KINDS):
@@ -285,6 +383,8 @@ def actual_outcomes(
     n = 0
     for event in events:
         info = teams_info(event['event_id'])
+        if not info:
+            info = teams_info_2(event['event_id'])
         if info:
             info.update(event)
             result.append(info)
